@@ -23,7 +23,7 @@
  * Prerequisites:
  *   1. gcloud auth application-default login
  *   2. export GOOGLE_CLOUD_PROJECT=your-project-id
- *   3. export GOOGLE_CLOUD_LOCATION=us-east5  (optional, defaults to us-east5)
+ *   3. export GOOGLE_CLOUD_LOCATION=eu  (optional, defaults to eu)
  *
  * Usage:
  *   pi --provider anthropic-vertex --model claude-opus-4-6
@@ -48,7 +48,14 @@ const project = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
 const region =
   process.env.GOOGLE_CLOUD_LOCATION ||
   process.env.CLOUD_ML_REGION ||
-  "us-east5";
+  "eu";
+
+function getVertexBaseUrl(region: string): string {
+  if (region === "eu" || region === "us")
+    return `https://aiplatform.${region}.rep.googleapis.com`;
+  if (region === "global") return "https://aiplatform.googleapis.com";
+  return `https://${region}-aiplatform.googleapis.com`;
+}
 
 export default function (pi: ExtensionAPI) {
   if (!project) {
@@ -90,7 +97,7 @@ export default function (pi: ExtensionAPI) {
   );
 
   pi.registerProvider("anthropic-vertex", {
-    baseUrl: `https://${region}-aiplatform.googleapis.com`,
+    baseUrl: getVertexBaseUrl(region),
     apiKey: "$GOOGLE_CLOUD_PROJECT",
     api: "anthropic-vertex",
     models,

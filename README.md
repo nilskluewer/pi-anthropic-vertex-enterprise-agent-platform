@@ -17,7 +17,7 @@ caching, thinking blocks, partial JSON streaming, usage tracking, and cost calcu
 pi install npm:@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform
 gcloud auth application-default login
 export GOOGLE_CLOUD_PROJECT=your-project-id
-export GOOGLE_CLOUD_LOCATION=us-east5
+export GOOGLE_CLOUD_LOCATION=eu
 pi --provider anthropic-vertex --model claude-sonnet-4-6
 ```
 
@@ -46,7 +46,7 @@ Environment variables:
 |------|-------------|---------|
 | `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID used by Vertex AI. | Required |
 | `GCLOUD_PROJECT` | Fallback project ID if `GOOGLE_CLOUD_PROJECT` is not set. | Optional |
-| `GOOGLE_CLOUD_LOCATION` | Vertex AI region. | `us-east5` |
+| `GOOGLE_CLOUD_LOCATION` | Vertex AI region or multi-region. Use `eu` for the EU multi-region endpoint. | `eu` |
 | `CLOUD_ML_REGION` | Fallback region if `GOOGLE_CLOUD_LOCATION` is not set. | Optional |
 
 ## Run
@@ -66,6 +66,10 @@ pi --provider anthropic-vertex --model claude-opus-4-6
 
 The extension registers Claude model definitions from Pi's built-in Anthropic provider
 at runtime, so newly supported Claude models are picked up when Pi updates.
+
+For the `eu` and `us` multi-regions, Vertex AI uses `aiplatform.<region>.rep.googleapis.com`
+endpoints. The package defaults to `eu`; set `GOOGLE_CLOUD_LOCATION` when you need a
+specific supported region such as `us-east5`.
 
 ## License
 
