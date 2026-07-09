@@ -60,18 +60,27 @@ const DEFAULT_REGION = "eu";
 const savedConfig = readSetupConfig();
 let currentProject = resolveProject(savedConfig);
 let currentRegion = resolveRegion(savedConfig);
-if (currentProject && !process.env.GOOGLE_CLOUD_PROJECT)
-  process.env.GOOGLE_CLOUD_PROJECT = currentProject;
-if (!process.env.GOOGLE_CLOUD_LOCATION) process.env.GOOGLE_CLOUD_LOCATION = currentRegion;
+if (currentProject) {
+  process.env.GOOGLE_CLOUD_PROJECT ||= currentProject;
+  process.env.ANTHROPIC_VERTEX_PROJECT_ID ||= currentProject;
+}
+process.env.GOOGLE_CLOUD_LOCATION ||= currentRegion;
+process.env.CLOUD_ML_REGION ||= currentRegion;
 
 function resolveProject(config: VertexSetupConfig): string | undefined {
-  return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || config.project;
+  return (
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.ANTHROPIC_VERTEX_PROJECT_ID ||
+    process.env.GCLOUD_PROJECT ||
+    config.project
+  );
 }
 
 function resolveRegion(config: VertexSetupConfig): string {
   return (
     process.env.GOOGLE_CLOUD_LOCATION ||
     process.env.CLOUD_ML_REGION ||
+    process.env.VERTEX_REGION ||
     config.location ||
     DEFAULT_REGION
   );
@@ -81,7 +90,9 @@ function applyRuntimeConfig(project: string, region: string): void {
   currentProject = project;
   currentRegion = region;
   process.env.GOOGLE_CLOUD_PROJECT = project;
+  process.env.ANTHROPIC_VERTEX_PROJECT_ID = project;
   process.env.GOOGLE_CLOUD_LOCATION = region;
+  process.env.CLOUD_ML_REGION = region;
   sharedClient.clear();
 }
 
@@ -186,26 +197,10 @@ function registerSetupCommand(pi: ExtensionAPI): void {
   });
 }
 
-type SupportedModelConfig = Omit<Model<Api>, "api" | "provider" | "baseUrl">;
-
-const SUPPORTED_MODEL_ALIASES = [
-  { id: "claude-fable-5" },
-  { id: "claude-sonnet-5" },
-  { id: "claude-opus-4.8", sourceId: "claude-opus-4-8" },
-] as const;
-
-function getSupportedAnthropicVertexModels(): SupportedModelConfig[] {
-  const anthropicModels = getModels("anthropic");
-  return SUPPORTED_MODEL_ALIASES.flatMap(({ id, sourceId }) => {
-    const source = anthropicModels.find((model) => model.id === (sourceId || id));
-    if (!source) {
-      console.warn(
-        `[pi-anthropic-vertex-enterprise-agent-platform] skipped missing Anthropic model ${sourceId || id}`,
-      );
-      return [];
-    }
-
-    const {
+function getAnthropicVertexModels(): Omit<Model<Api>, "api" | "provider" | "baseUrl">[] {
+  return getModels("anthropic").map(
+    ({
+      id,
       name,
       compat,
       reasoning,
@@ -214,27 +209,24 @@ function getSupportedAnthropicVertexModels(): SupportedModelConfig[] {
       cost,
       contextWindow,
       maxTokens,
-    } = source;
-    return [
-      {
-        id,
-        name: id === source.id ? name : `${name} (${id})`,
-        compat,
-        reasoning,
-        thinkingLevelMap,
-        input,
-        cost,
-        contextWindow,
-        maxTokens,
-      },
-    ];
-  });
+    }) => ({
+      id,
+      name,
+      compat,
+      reasoning,
+      thinkingLevelMap,
+      input,
+      cost,
+      contextWindow,
+      maxTokens,
+    }),
+  );
 }
 
 function registerAnthropicVertexProvider(pi: ExtensionAPI): void {
   if (!currentProject) {
     console.warn(
-      "[pi-anthropic-vertex-enterprise-agent-platform] disabled: run /setup-vertexai or set GOOGLE_CLOUD_PROJECT",
+      "[pi-anthropic-vertex-enterprise-agent-platform] disabled: run /setup-vertexai or set GOOGLE_CLOUD_PROJECT/ANTHROPIC_VERTEX_PROJECT_ID",
     );
     return;
   }
@@ -243,8 +235,8 @@ function registerAnthropicVertexProvider(pi: ExtensionAPI): void {
   if (!anthropicApi)
     throw new Error("Built-in anthropic-messages provider not found");
 
-  // Expose the EU-verified Claude aliases this package supports.
-  const models = getSupportedAnthropicVertexModels();
+  // Pull model definitions from pi's built-in Anthropic provider at runtime.
+  const models = getAnthropicVertexModels();
   if (models.length === 0) return;
 
   pi.registerProvider("anthropic-vertex", {
@@ -417,8 +409,8 @@ function createVertexClient(
 ): AnthropicVertex {
   if (requestHeaders && Object.keys(requestHeaders).length > 0) {
     const opts = createVertexClientOpts(
-      project,
-      region,
+      currentProject,
+      currentRegion,
       isAdaptive,
       requestHeaders,
     );
@@ -428,7 +420,7 @@ function createVertexClient(
   const profile: Profile = isAdaptive ? "adaptive" : "legacy";
   let client = sharedClient.get(profile);
   if (!client) {
-    const opts = createVertexClientOpts(project, region, isAdaptive);
+    const opts = createVertexClientOpts(currentProject, currentRegion, isAdaptive);
     client = new AnthropicVertex(opts);
     sharedClient.set(profile, client);
   }

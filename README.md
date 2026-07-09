@@ -64,9 +64,11 @@ Environment variables override the saved setup:
 | Name | Description | Default |
 |------|-------------|---------|
 | `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID used by Vertex AI. | Saved setup value |
-| `GCLOUD_PROJECT` | Fallback project ID if `GOOGLE_CLOUD_PROJECT` is not set. | Optional |
+| `ANTHROPIC_VERTEX_PROJECT_ID` | Claude Code compatible fallback project ID. | Optional |
+| `GCLOUD_PROJECT` | Fallback project ID if the values above are not set. | Optional |
 | `GOOGLE_CLOUD_LOCATION` | Vertex AI region or multi-region. Use `eu` for the EU multi-region endpoint. | Saved setup value or `eu` |
-| `CLOUD_ML_REGION` | Fallback region if `GOOGLE_CLOUD_LOCATION` is not set. | Optional |
+| `CLOUD_ML_REGION` | Claude Code compatible fallback region. | Optional |
+| `VERTEX_REGION` | Additional fallback region. | Optional |
 
 ## Run
 
@@ -76,16 +78,18 @@ Try the package without adding it to your settings:
 pi -e npm:@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform
 ```
 
-Use one of the supported Claude models:
+Use any Claude model exposed by Pi's built-in Anthropic model list and enabled in
+your Vertex AI project. These models are verified with this package:
 
 ```bash
 pi --provider anthropic-vertex --model claude-fable-5
 pi --provider anthropic-vertex --model claude-sonnet-5
-pi --provider anthropic-vertex --model claude-opus-4.8
+pi --provider anthropic-vertex --model claude-opus-4-8
 ```
 
-The extension reuses model metadata from Pi's built-in Anthropic provider, but only
-exposes the Claude models verified for this package.
+The extension registers Claude model metadata from Pi's built-in Anthropic provider at
+runtime. If Pi adds newer Claude models and they are enabled in your Vertex AI project,
+they can be used through this provider as well.
 
 For the `eu` and `us` multi-regions, Vertex AI uses `aiplatform.<region>.rep.googleapis.com`
 endpoints. The package defaults to `eu`; set another location in `/setup-vertexai` or
