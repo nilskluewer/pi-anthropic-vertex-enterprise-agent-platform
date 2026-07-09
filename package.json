@@ -1,0 +1,54 @@
+{
+  "name": "@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform",
+  "version": "0.1.0",
+  "description": "Anthropic Claude models on Google Cloud Vertex AI / Gemini Enterprise Agent Platform for pi.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "anthropic",
+    "claude",
+    "vertex-ai",
+    "google-cloud",
+    "enterprise-agent-platform"
+  ],
+  "author": {
+    "name": "Nils Klüwer",
+    "url": "https://github.com/nilskluewer"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nilskluewer/pi-anthropic-vertex-enterprise-agent-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nilskluewer/pi-anthropic-vertex-enterprise-agent-platform/issues"
+  },
+  "homepage": "https://github.com/nilskluewer/pi-anthropic-vertex-enterprise-agent-platform#readme",
+  "files": [
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/anthropic-vertex-enterprise-agent-platform.ts"
+    ]
+  },
+  "dependencies": {
+    "@anthropic-ai/vertex-sdk": "^0.19.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "pack:dry": "npm pack --dry-run --registry=https://registry.npmjs.org/"
+  }
+}
