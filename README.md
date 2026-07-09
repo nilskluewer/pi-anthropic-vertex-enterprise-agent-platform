@@ -17,7 +17,7 @@ caching, thinking blocks, partial JSON streaming, usage tracking, and cost calcu
 pi install npm:@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform
 pi
 /setup-vertexai your-project-id eu
-/model anthropic-vertex/claude-sonnet-4-6
+/model anthropic-vertex/claude-sonnet-5
 ```
 
 ## Structure
@@ -76,15 +76,16 @@ Try the package without adding it to your settings:
 pi -e npm:@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform
 ```
 
-Use any Claude model available in your Pi installation:
+Use one of the supported Claude models:
 
 ```bash
-pi --provider anthropic-vertex --model claude-sonnet-4-6
-pi --provider anthropic-vertex --model claude-opus-4-6
+pi --provider anthropic-vertex --model claude-fable-5
+pi --provider anthropic-vertex --model claude-sonnet-5
+pi --provider anthropic-vertex --model claude-opus-4.8
 ```
 
-The extension registers Claude model definitions from Pi's built-in Anthropic provider
-at runtime, so newly supported Claude models are picked up when Pi updates.
+The extension reuses model metadata from Pi's built-in Anthropic provider, but only
+exposes the Claude models verified for this package.
 
 For the `eu` and `us` multi-regions, Vertex AI uses `aiplatform.<region>.rep.googleapis.com`
 endpoints. The package defaults to `eu`; set another location in `/setup-vertexai` or

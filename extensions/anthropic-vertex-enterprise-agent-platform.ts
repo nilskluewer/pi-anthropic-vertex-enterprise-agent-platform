@@ -186,6 +186,51 @@ function registerSetupCommand(pi: ExtensionAPI): void {
   });
 }
 
+type SupportedModelConfig = Omit<Model<Api>, "api" | "provider" | "baseUrl">;
+
+const SUPPORTED_MODEL_ALIASES = [
+  { id: "claude-fable-5" },
+  { id: "claude-sonnet-5" },
+  { id: "claude-opus-4.8", sourceId: "claude-opus-4-8" },
+] as const;
+
+function getSupportedAnthropicVertexModels(): SupportedModelConfig[] {
+  const anthropicModels = getModels("anthropic");
+  return SUPPORTED_MODEL_ALIASES.flatMap(({ id, sourceId }) => {
+    const source = anthropicModels.find((model) => model.id === (sourceId || id));
+    if (!source) {
+      console.warn(
+        `[pi-anthropic-vertex-enterprise-agent-platform] skipped missing Anthropic model ${sourceId || id}`,
+      );
+      return [];
+    }
+
+    const {
+      name,
+      compat,
+      reasoning,
+      thinkingLevelMap,
+      input,
+      cost,
+      contextWindow,
+      maxTokens,
+    } = source;
+    return [
+      {
+        id,
+        name: id === source.id ? name : `${name} (${id})`,
+        compat,
+        reasoning,
+        thinkingLevelMap,
+        input,
+        cost,
+        contextWindow,
+        maxTokens,
+      },
+    ];
+  });
+}
+
 function registerAnthropicVertexProvider(pi: ExtensionAPI): void {
   if (!currentProject) {
     console.warn(
@@ -198,32 +243,9 @@ function registerAnthropicVertexProvider(pi: ExtensionAPI): void {
   if (!anthropicApi)
     throw new Error("Built-in anthropic-messages provider not found");
 
-  // Pull model definitions from pi's built-in Anthropic provider at runtime.
-  const anthropicModels = getModels("anthropic");
-  if (anthropicModels.length === 0) return;
-  const models = anthropicModels.map(
-    ({
-      id,
-      name,
-      compat,
-      reasoning,
-      thinkingLevelMap,
-      input,
-      cost,
-      contextWindow,
-      maxTokens,
-    }) => ({
-      id,
-      name,
-      compat,
-      reasoning,
-      thinkingLevelMap,
-      input,
-      cost,
-      contextWindow,
-      maxTokens,
-    }),
-  );
+  // Expose the EU-verified Claude aliases this package supports.
+  const models = getSupportedAnthropicVertexModels();
+  if (models.length === 0) return;
 
   pi.registerProvider("anthropic-vertex", {
     baseUrl: getVertexBaseUrl(currentRegion),
