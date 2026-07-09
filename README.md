@@ -15,10 +15,9 @@ caching, thinking blocks, partial JSON streaming, usage tracking, and cost calcu
 
 ```bash
 pi install npm:@nilskluewer/pi-anthropic-vertex-enterprise-agent-platform
-gcloud auth application-default login
-export GOOGLE_CLOUD_PROJECT=your-project-id
-export GOOGLE_CLOUD_LOCATION=eu
-pi --provider anthropic-vertex --model claude-sonnet-4-6
+pi
+/setup-vertexai your-project-id eu
+/model anthropic-vertex/claude-sonnet-4-6
 ```
 
 ## Structure
@@ -38,15 +37,35 @@ Requirements:
 
 - Google Cloud project with the Vertex AI API enabled.
 - Claude models enabled in Model Garden / Gemini Enterprise Agent Platform.
-- Google Application Default Credentials configured locally.
+- `gcloud` CLI installed for Google Application Default Credentials.
 
-Environment variables:
+Run the Pi setup command after installing the package:
+
+```text
+/setup-vertexai <google-cloud-project> [location]
+```
+
+Example:
+
+```text
+/setup-vertexai my-project-id eu
+```
+
+The command stores the project and location in Pi's user config directory and checks
+Google Application Default Credentials. If credentials are missing in interactive mode,
+it can run:
+
+```bash
+gcloud auth application-default login
+```
+
+Environment variables override the saved setup:
 
 | Name | Description | Default |
 |------|-------------|---------|
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID used by Vertex AI. | Required |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID used by Vertex AI. | Saved setup value |
 | `GCLOUD_PROJECT` | Fallback project ID if `GOOGLE_CLOUD_PROJECT` is not set. | Optional |
-| `GOOGLE_CLOUD_LOCATION` | Vertex AI region or multi-region. Use `eu` for the EU multi-region endpoint. | `eu` |
+| `GOOGLE_CLOUD_LOCATION` | Vertex AI region or multi-region. Use `eu` for the EU multi-region endpoint. | Saved setup value or `eu` |
 | `CLOUD_ML_REGION` | Fallback region if `GOOGLE_CLOUD_LOCATION` is not set. | Optional |
 
 ## Run
@@ -68,8 +87,8 @@ The extension registers Claude model definitions from Pi's built-in Anthropic pr
 at runtime, so newly supported Claude models are picked up when Pi updates.
 
 For the `eu` and `us` multi-regions, Vertex AI uses `aiplatform.<region>.rep.googleapis.com`
-endpoints. The package defaults to `eu`; set `GOOGLE_CLOUD_LOCATION` when you need a
-specific supported region such as `us-east5`.
+endpoints. The package defaults to `eu`; set another location in `/setup-vertexai` or
+`GOOGLE_CLOUD_LOCATION` when you need a specific supported region such as `us-east5`.
 
 ## License
 

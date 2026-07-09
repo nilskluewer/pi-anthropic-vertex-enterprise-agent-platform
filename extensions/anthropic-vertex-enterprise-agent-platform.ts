@@ -29,6 +29,9 @@
  *   pi --provider anthropic-vertex --model claude-opus-4-6
  */
 
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { AnthropicVertex, type ClientOptions } from "@anthropic-ai/vertex-sdk";
 import {
   getApiProvider,
@@ -42,13 +45,45 @@ import {
   type ThinkingBudgets,
   type ThinkingLevel,
 } from "@earendil-works/pi-ai/compat";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const project = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-const region =
-  process.env.GOOGLE_CLOUD_LOCATION ||
-  process.env.CLOUD_ML_REGION ||
-  "eu";
+type VertexSetupConfig = {
+  project?: string;
+  location?: string;
+};
+
+const CONFIG_FILE = join(
+  getAgentDir(),
+  "anthropic-vertex-enterprise-agent-platform.json",
+);
+const DEFAULT_REGION = "eu";
+const savedConfig = readSetupConfig();
+let currentProject = resolveProject(savedConfig);
+let currentRegion = resolveRegion(savedConfig);
+if (currentProject && !process.env.GOOGLE_CLOUD_PROJECT)
+  process.env.GOOGLE_CLOUD_PROJECT = currentProject;
+if (!process.env.GOOGLE_CLOUD_LOCATION) process.env.GOOGLE_CLOUD_LOCATION = currentRegion;
+
+function resolveProject(config: VertexSetupConfig): string | undefined {
+  return process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || config.project;
+}
+
+function resolveRegion(config: VertexSetupConfig): string {
+  return (
+    process.env.GOOGLE_CLOUD_LOCATION ||
+    process.env.CLOUD_ML_REGION ||
+    config.location ||
+    DEFAULT_REGION
+  );
+}
+
+function applyRuntimeConfig(project: string, region: string): void {
+  currentProject = project;
+  currentRegion = region;
+  process.env.GOOGLE_CLOUD_PROJECT = project;
+  process.env.GOOGLE_CLOUD_LOCATION = region;
+  sharedClient.clear();
+}
 
 function getVertexBaseUrl(region: string): string {
   if (region === "eu" || region === "us")
@@ -57,10 +92,104 @@ function getVertexBaseUrl(region: string): string {
   return `https://${region}-aiplatform.googleapis.com`;
 }
 
-export default function (pi: ExtensionAPI) {
-  if (!project) {
+function readSetupConfig(): VertexSetupConfig {
+  if (!existsSync(CONFIG_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(CONFIG_FILE, "utf8")) as VertexSetupConfig;
+  } catch (error) {
     console.warn(
-      "[pi-anthropic-vertex-enterprise-agent-platform] disabled: GOOGLE_CLOUD_PROJECT is not set",
+      `[pi-anthropic-vertex-enterprise-agent-platform] ignoring invalid config ${CONFIG_FILE}: ${String(error)}`,
+    );
+    return {};
+  }
+}
+
+function writeSetupConfig(config: Required<VertexSetupConfig>): void {
+  mkdirSync(dirname(CONFIG_FILE), { recursive: true });
+  writeFileSync(CONFIG_FILE, `${JSON.stringify(config, null, 2)}\n`, {
+    mode: 0o600,
+  });
+}
+
+function checkApplicationDefaultCredentials(): boolean {
+  try {
+    execFileSync("gcloud", ["auth", "application-default", "print-access-token"], {
+      stdio: "ignore",
+      timeout: 15_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function runApplicationDefaultLogin(): void {
+  spawnSync("gcloud", ["auth", "application-default", "login"], {
+    stdio: "inherit",
+  });
+}
+
+export default function (pi: ExtensionAPI) {
+  registerSetupCommand(pi);
+  registerAnthropicVertexProvider(pi);
+}
+
+function registerSetupCommand(pi: ExtensionAPI): void {
+  pi.registerCommand("setup-vertexai", {
+    description: "Configure Anthropic Vertex AI project, region, and ADC auth",
+    handler: async (args, ctx) => {
+      const [projectArg, regionArg] = args.trim().split(/\s+/).filter(Boolean);
+      const project =
+        projectArg ||
+        (ctx.hasUI
+          ? await ctx.ui.input(
+              "Google Cloud project ID",
+              currentProject || "your-project-id",
+            )
+          : undefined);
+      if (!project) {
+        ctx.ui.notify(
+          "Usage: /setup-vertexai <google-cloud-project> [location]",
+          "error",
+        );
+        return;
+      }
+
+      const region =
+        regionArg ||
+        (ctx.hasUI
+          ? await ctx.ui.input("Vertex AI location", currentRegion || DEFAULT_REGION)
+          : undefined) ||
+        DEFAULT_REGION;
+
+      writeSetupConfig({ project, location: region });
+      applyRuntimeConfig(project, region);
+      registerAnthropicVertexProvider(pi);
+
+      const authOk = checkApplicationDefaultCredentials();
+      if (!authOk && ctx.hasUI) {
+        const runLogin = await ctx.ui.confirm(
+          "Google ADC is not configured",
+          "Run `gcloud auth application-default login` now?",
+        );
+        if (runLogin) runApplicationDefaultLogin();
+      }
+
+      const authStatus = checkApplicationDefaultCredentials()
+        ? "Google ADC is available."
+        : "Google ADC is not available. Run: gcloud auth application-default login";
+      ctx.ui.notify(
+        `Anthropic Vertex AI configured: project=${project}, location=${region}. ${authStatus}`,
+        authStatus.startsWith("Google ADC is available") ? "info" : "warning",
+      );
+    },
+  });
+}
+
+function registerAnthropicVertexProvider(pi: ExtensionAPI): void {
+  if (!currentProject) {
+    console.warn(
+      "[pi-anthropic-vertex-enterprise-agent-platform] disabled: run /setup-vertexai or set GOOGLE_CLOUD_PROJECT",
     );
     return;
   }
@@ -97,7 +226,7 @@ export default function (pi: ExtensionAPI) {
   );
 
   pi.registerProvider("anthropic-vertex", {
-    baseUrl: getVertexBaseUrl(region),
+    baseUrl: getVertexBaseUrl(currentRegion),
     apiKey: "$GOOGLE_CLOUD_PROJECT",
     api: "anthropic-vertex",
     models,
